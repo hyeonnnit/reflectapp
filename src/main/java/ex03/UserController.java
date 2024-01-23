@@ -1,7 +1,7 @@
 package ex03;
 
 import ex02.RequestMapping;
-
+@Controller
 public class UserController {
 
     // /login

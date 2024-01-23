@@ -1,30 +1,63 @@
 package ex03;
 
-import ex02.RequestMapping;
-import ex02.UserController;
-
+import java.io.File;
 import java.lang.reflect.Method;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 public class App {
-    public static void findUri(ex03.UserController con, String path){
-        Method[] methods = con.getClass().getDeclaredMethods(); //getDeclaredMethods 는 UserController 의 메서드를 다 들고옴
-//        System.out.println(methods.length);  // Method[] 의 크기
-        for (Method method : methods) {
-//            System.out.println(method.getName());  메서드 이름
-            RequestMapping rm = method.getDeclaredAnnotation(RequestMapping.class);// 이 메서드에 어떤 어노테이션이 있는지
-            if(rm==null)continue; // user 컨트롤러에서 어노테이션이 없는 것 때문에 오류남. 그래서 널 값으면 무시하고 아래 코드 실행
-            if(rm.uri().equals(path)){  //외부에서 들어온 path 와 uri 가 같다면 메서드 호출
-                try {
-                    method.invoke(con); // = con.login() 메서드를 리플렉션으로 호출 , con 은 힙이 여러개 일 수 있기 때문에 어떤 힙의 메서드인지 구분하기 위해 넣음.
-                    break; //찾으면 끝
-                } catch (Exception e) {
-                    e.printStackTrace();
+
+    public static void findUri(List<Object> instances, String path){
+
+        for (Object instance : instances){
+            Method[] methods = instance.getClass().getDeclaredMethods();
+
+            for(Method method : methods){
+                RequestMapping rm = method.getDeclaredAnnotation(RequestMapping.class);
+
+                if(rm == null) continue;
+
+                if(rm.uri().equals(path)){
+                    try {
+                        method.invoke(instance); // con.login();
+                        break;
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
             }
         }
     }
-    public static void main(String[] args) {
-        String path = "/write";
-        findUri(new ex03.UserController(), "/login");
+
+    public static List<Object> componentScan(String pkg) throws URISyntaxException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        URL packageUrl = classLoader.getResource(pkg);
+
+        File ex03 = new File(packageUrl.toURI());
+
+        List<Object> instances = new ArrayList<>();
+
+        for (File file : ex03.listFiles()){
+            //System.out.println(file.getName());
+            if(file.getName().endsWith(".class")){
+                String className = pkg + "." + file.getName().replace(".class", "");
+                //System.out.println(className);
+
+                Class cls = Class.forName(className);
+                if(cls.isAnnotationPresent(Controller.class)){
+                    Object instance = cls.newInstance();
+                    instances.add(instance); // UserController, BoardController
+                }
+
+            }
+        }
+        return instances;
+    }
+
+    public static void main(String[] args) throws URISyntaxException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+        List<Object> instances = componentScan("ex03");
+        findUri(instances, "/login");
     }
 }
